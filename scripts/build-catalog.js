@@ -37,13 +37,32 @@ function stripComments(src) {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
 }
 
+// Advertisement tests: { given: { manufacturerData?, serviceData?, meta? }, expected }.
+// Streaming tests (sensor-ble's format): { given: { data: [{ service,
+// characteristic, data }] }, expected } — start() with a no-op bleApi, feed
+// each message to its notify handler, compare the last non-null result.
+function runOne(decoder, t) {
+  if (t.given.data) {
+    decoder.start('test-device', false, { write: async () => {} });
+    let last = null;
+    for (const m of t.given.data) {
+      const h = decoder.notify.find((n) => n.service === m.service && n.characteristic === m.characteristic);
+      if (!h) throw new Error(`no notify handler for ${m.service} ${m.characteristic}`);
+      const out = h.onNotification('test-device', Buffer.from(m.data, 'hex'));
+      if (out) last = out;
+    }
+    return last;
+  }
+  const md = t.given.manufacturerData ? Buffer.from(t.given.manufacturerData, 'hex') : undefined;
+  const sd = Object.fromEntries(
+    Object.entries(t.given.serviceData ?? {}).map(([uuid, hex]) => [uuid, Buffer.from(hex, 'hex')]),
+  );
+  return decoder.advertisementDecode(md, sd, t.given.meta ?? {});
+}
+
 function runTests(decoder, tests, file) {
   tests.forEach((t, i) => {
-    const md = t.given.manufacturerData ? Buffer.from(t.given.manufacturerData, 'hex') : undefined;
-    const sd = Object.fromEntries(
-      Object.entries(t.given.serviceData ?? {}).map(([uuid, hex]) => [uuid, Buffer.from(hex, 'hex')]),
-    );
-    const got = decoder.advertisementDecode(md, sd, t.given.meta ?? {});
+    const got = runOne(decoder, t);
     try {
       assert.deepStrictEqual(got, t.expected);
     } catch {
@@ -61,14 +80,17 @@ async function loadDecoder(file) {
   const mod = await import(pathToFileURL(full).href);
   const d = mod.decoder;
   if (!d || typeof d.decoderName !== 'string' || !d.decoderName) throw new Error(`${file}: no decoder.decoderName`);
-  if (typeof d.advertisementDecode !== 'function') throw new Error(`${file}: no advertisementDecode()`);
+  const streaming = typeof d.start === 'function' && Array.isArray(d.notify);
+  if (typeof d.advertisementDecode !== 'function' && !streaming) {
+    throw new Error(`${file}: needs advertisementDecode(), or start() and a notify array`);
+  }
   const tests = mod.tests ?? [];
   if (!tests.length) throw new Error(`${file}: no tests — add at least one given/expected pair`);
   runTests(d, tests, file);
 
   const mdFile = path.join(SRC, file.replace(/\.js$/, '.md'));
   const matchers = {};
-  for (const k of ['manufacturer', 'serviceUUID', 'name', 'matchAll']) if (d[k] !== undefined) matchers[k] = d[k];
+  for (const k of ['manufacturer', 'serviceUUID', 'name', 'matchAll']) if (d[k] != null) matchers[k] = d[k];
   return {
     entry: {
       decoderName: d.decoderName,
@@ -81,6 +103,7 @@ async function loadDecoder(file) {
       url: `decoders/${file}`,
       sha256: crypto.createHash('sha256').update(src).digest('hex'),
       matchers,
+      ...(streaming ? { streaming: true } : {}),
       updated: fs.statSync(full).mtime.toISOString().slice(0, 10),
     },
     longText: fs.existsSync(mdFile) ? fs.readFileSync(mdFile, 'utf8') : '',
@@ -129,6 +152,7 @@ function page(catalog, extras) {
   ${longText ? markdown(longText) : ''}
   <dl>
     <dt>decoderName</dt><dd><code>${esc(e.decoderName)}</code></dd>
+    <dt>Type</dt><dd>${e.streaming ? 'connected sensor (GATT: start / notify)' : 'advertisement'}</dd>
     <dt>Matches</dt><dd><code>${esc(matcherText(e.matchers))}</code></dd>
     <dt>Author</dt><dd>${esc(e.author || '—')}</dd>
     <dt>License</dt><dd>${esc(e.license || '—')}</dd>
