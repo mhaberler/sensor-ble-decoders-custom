@@ -1,0 +1,12 @@
+{
+  "name": "sensor-ble-decoder-catalog",
+  "private": true,
+  "type": "module",
+  "description": "A catalog of sensor-ble decoders, published as a browsable page and decoders.json on GitHub Pages",
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/build-catalog.js",
+    "preview": "node scripts/build-catalog.js && node scripts/preview.js"
+  },
+  "engines": { "node": ">=20" }
+}

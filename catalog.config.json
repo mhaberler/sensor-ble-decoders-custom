@@ -1,0 +1,7 @@
+{
+  "title": "Sensor-BLE decoder catalog (example)",
+  "description": "An example catalog of sensor-ble decoders. Use this repository as a template to publish your own.",
+  "homepage": "https://github.com/mhaberler/sensor-ble-decoder-catalog",
+  "webAppUrl": "https://mhaberler.github.io/theengs-online-decoder/",
+  "qrTarget": "deeplink"
+}
