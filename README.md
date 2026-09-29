@@ -1,15 +1,26 @@
-# sensor-ble decoder catalog (template)
+# Sensor-BLE decoders (mhaberler)
 
-A template for publishing your own [sensor-ble](https://github.com/tszheichoi/sensor-ble)
-BLE decoders as a **catalog**: a browsable web page on GitHub Pages plus a
-machine-readable `decoders.json` that apps can read to offer the decoders for
-one-tap installation.
+A catalog of [sensor-ble](https://github.com/tszheichoi/sensor-ble) BLE
+decoders, published at **<https://mhaberler.github.io/sensor-ble-decoders-custom/>**
+as a browsable page plus a machine-readable `decoders.json`.
 
-- **Live example:** <https://mhaberler.github.io/sensor-ble-decoder-catalog/>
-- **Consumers:** the [Sensor-BLE web app and mobile app](https://github.com/mhaberler/theengs-online-decoder)
-  (add the catalog URL, then install from the list), and
-  [Sensor Logger](https://www.tszheichoi.com/sensorlogger) (copy a decoder URL
-  into *Custom Decoders → Add Decoder*).
+| Decoder | What it decodes | License |
+|---|---|---|
+| `theengs` | every device [TheengsDecoder](https://decoder.theengs.io/) supports — a catch-all fallback (`matchAll`), tried after all other decoders; inactive in Sensor Logger | GPL-3.0-only |
+| `mystery` | level, voltage, temperature and serial from company-ID 0x1044 adverts (divined) | MIT |
+
+- **Sensor-BLE web and mobile app** ([theengs-online-decoder](https://github.com/mhaberler/theengs-online-decoder)):
+  this catalog is preset; install from the Decoders tab. Or use the page's
+  **Add to Sensor-BLE** button / QR code.
+- **Sensor Logger:** copy a decoder URL from the page into *Custom Decoders →
+  Add Decoder* (`theengs` needs `matchAll`, which Sensor Logger doesn't support).
+
+`decoders/theengs.js` is **generated** in theengs-online-decoder — don't edit
+it here; update it there with `bun run publish-catalog`, then commit and push
+this repo.
+
+Built from the [sensor-ble-decoder-catalog](https://github.com/mhaberler/sensor-ble-decoder-catalog)
+template; the rest of this README is the template's documentation.
 
 ## Make your own catalog
 
