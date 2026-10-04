@@ -1,12 +1,12 @@
 {
-  "name": "sensor-ble-decoder-catalog",
+  "name": "sensor-ble-decoders-custom",
   "private": true,
   "type": "module",
-  "description": "A catalog of sensor-ble decoders, published as a browsable page and decoders.json on GitHub Pages",
+  "description": "sensor-ble decoders, published on GitHub Pages with a Sensor Logger deep link and QR code each",
   "license": "MIT",
   "scripts": {
-    "build": "node scripts/build-catalog.js",
-    "preview": "node scripts/build-catalog.js && node scripts/preview.js"
+    "build": "node scripts/build.js",
+    "preview": "node scripts/build.js && node scripts/preview.js"
   },
   "engines": { "node": ">=20" }
 }

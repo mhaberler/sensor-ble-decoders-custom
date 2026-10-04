@@ -1,0 +1,6 @@
+{
+  "title": "Sensor-BLE decoders (mhaberler)",
+  "description": "Custom BLE decoders for Sensor Logger: TheengsDecoder as a catch-all, plus decoders for devices without public specs.",
+  "homepage": "https://github.com/mhaberler/sensor-ble-decoders-custom",
+  "siteUrl": "https://mhaberler.github.io/sensor-ble-decoders-custom/"
+}

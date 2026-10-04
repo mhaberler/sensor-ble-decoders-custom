@@ -1,7 +1,0 @@
-{
-  "title": "Sensor-BLE decoders (mhaberler)",
-  "description": "BLE decoders for the Sensor-BLE web and mobile apps and for Sensor Logger: TheengsDecoder as a catch-all, plus divined decoders for devices without public specs.",
-  "homepage": "https://github.com/mhaberler/sensor-ble-decoders-custom",
-  "webAppUrl": "https://mhaberler.github.io/theengs-online-decoder/",
-  "qrTarget": "deeplink"
-}

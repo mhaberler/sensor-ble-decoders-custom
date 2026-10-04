@@ -1,5 +1,5 @@
 // Serve site/ on http://localhost:8080/ for a local preview (zero-dependency).
-// CORS is open so a locally running web app can add this catalog.
+// CORS is open so a locally running web app can fetch the decoders.
 
 import http from 'node:http';
 import fs from 'node:fs';

@@ -1,21 +1,20 @@
-// Build the catalog site from decoders/*.js into site/:
+// Build the site from decoders/*.js into site/:
 //
-//   site/decoders.json      machine-readable catalog (schema 1) for apps
-//   site/index.html         browsable page, with a <link rel="alternate"> to the JSON
+//   site/index.html         one card per decoder, each with a Sensor Logger
+//                           deep link (sensorlogger://decoder/{url}) and its QR code
 //   site/decoders/*.js      the decoder files, served as-is
 //
-// For every decoder it runs the module's `tests`, checks the Sensor Logger
-// sandbox rule (no import/require) and records a sha256 of the file. Any
-// failure exits non-zero, so CI never publishes a broken catalog.
+// For every decoder it runs the module's `tests` and checks the Sensor Logger
+// sandbox rule (no import/require). Any failure exits non-zero, so CI never
+// publishes a broken decoder.
 //
 // Zero dependencies: Node >= 20 only (QR encoder vendored in scripts/vendor/).
 //
-// Env: CATALOG_URL — public URL of the site (CI passes the GitHub Pages URL);
-// defaults to catalog.config.json "siteUrl", then http://localhost:8080/.
+// Env: SITE_URL — public URL of the site (CI passes the GitHub Pages URL);
+// defaults to site.config.json "siteUrl", then http://localhost:8080/.
 
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import assert from 'node:assert';
 import { createRequire } from 'node:module';
 import { pathToFileURL, fileURLToPath } from 'node:url';
@@ -25,8 +24,8 @@ const SRC = path.join(ROOT, 'decoders');
 const OUT = path.join(ROOT, 'site');
 const qrcode = createRequire(import.meta.url)('./vendor/qrcode.cjs');
 
-const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'catalog.config.json'), 'utf8'));
-const siteUrl = withSlash(process.env.CATALOG_URL || config.siteUrl || 'http://localhost:8080/');
+const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'site.config.json'), 'utf8'));
+const siteUrl = withSlash(process.env.SITE_URL || config.siteUrl || 'http://localhost:8080/');
 
 function withSlash(u) {
   return u.endsWith('/') ? u : u + '/';
@@ -101,7 +100,6 @@ async function loadDecoder(file) {
       license: d.license ?? '',
       tags: d.tags ?? [],
       url: `decoders/${file}`,
-      sha256: crypto.createHash('sha256').update(src).digest('hex'),
       matchers,
       ...(streaming ? { streaming: true } : {}),
       updated: fs.statSync(full).mtime.toISOString().slice(0, 10),
@@ -131,25 +129,31 @@ function qrSvg(text) {
   return qr.createSvgTag({ cellSize: 4, margin: 16, scalable: true, alt: 'QR code: ' + text });
 }
 
-function importTarget() {
-  if (config.qrTarget === 'deeplink') return `sensorble://catalog?url=${encodeURIComponent(siteUrl)}`;
-  if (config.webAppUrl) return `${withSlash(config.webAppUrl)}?catalog=${encodeURIComponent(siteUrl)}`;
-  return siteUrl;
+// Sensor Logger (>= 1.68) opens its Add Custom Decoder prompt with the URL pre-filled.
+function deepLink(url) {
+  return `sensorlogger://decoder/${encodeURIComponent(url)}`;
 }
 
 function matcherText(m) {
   return Object.entries(m).map(([k, v]) => `${k}: ${v}`).join(', ') || '—';
 }
 
-function page(catalog, extras) {
-  const target = importTarget();
-  const cards = catalog.decoders.map((e, i) => {
+function page(site, extras) {
+  const cards = site.decoders.map((e, i) => {
     const { longText, tests } = extras[i];
     const abs = new URL(e.url, siteUrl).href;
+    const link = deepLink(abs);
     return `<article class="card" id="${esc(e.decoderName)}">
-  <h2>${esc(e.title)} <span class="ver">v${esc(e.version)}</span></h2>
-  <p>${esc(e.description)}</p>
-  ${longText ? markdown(longText) : ''}
+  <div class="head">
+    <div class="intro">
+      <h2>${esc(e.title)} <span class="ver">v${esc(e.version)}</span></h2>
+      <p>${esc(e.description)}</p>
+      ${longText ? markdown(longText) : ''}
+      ${e.matchers.matchAll ? '<p class="warn">Uses <code>matchAll</code>, which Sensor Logger doesn\'t support: the decoder imports but stays inactive there.</p>' : ''}
+      <a class="add" href="${esc(link)}">Add to Sensor Logger</a>
+    </div>
+    <div class="qr">${qrSvg(link)}<div class="muted">Scan to add to Sensor Logger</div></div>
+  </div>
   <dl>
     <dt>decoderName</dt><dd><code>${esc(e.decoderName)}</code></dd>
     <dt>Type</dt><dd>${e.streaming ? 'connected sensor (GATT: start / notify)' : 'advertisement'}</dd>
@@ -157,7 +161,6 @@ function page(catalog, extras) {
     <dt>Author</dt><dd>${esc(e.author || '—')}</dd>
     <dt>License</dt><dd>${esc(e.license || '—')}</dd>
     <dt>Tags</dt><dd>${e.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join(' ') || '—'}</dd>
-    <dt>sha256</dt><dd><code class="hash">${esc(e.sha256)}</code></dd>
   </dl>
   <div class="url"><input readonly value="${esc(abs)}" aria-label="Decoder URL"><button data-copy="${esc(abs)}">Copy URL</button>
     <a href="${esc(e.url)}">view source</a></div>
@@ -171,17 +174,16 @@ function page(catalog, extras) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(catalog.title)}</title>
-<meta name="description" content="${esc(catalog.description)}">
-<link rel="alternate" type="application/vnd.sensorble.catalog+json" href="decoders.json">
+<title>${esc(site.title)}</title>
+<meta name="description" content="${esc(site.description)}">
 <style>
   :root { --bg: #fff; --fg: #1d1d1f; --muted: #5f6368; --card: #f6f7f9; --line: #dfe1e5; --accent: #1565c0; }
   @media (prefers-color-scheme: dark) { :root { --bg: #121417; --fg: #e8eaed; --muted: #9aa0a6; --card: #1d2025; --line: #33373d; --accent: #8ab4f8; } }
   * { box-sizing: border-box; }
   body { margin: 0 auto; max-width: 880px; padding: 1.5rem 16px 3rem; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
   a { color: var(--accent); }
-  header { display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
-  header .intro { flex: 1; min-width: 16rem; }
+  .head { display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
+  .head .intro { flex: 1; min-width: 16rem; }
   h1 { margin: 0 0 .4rem; font-size: 1.6rem; }
   .muted { color: var(--muted); }
   .qr { width: 132px; text-align: center; font-size: 12px; }
@@ -193,7 +195,7 @@ function page(catalog, extras) {
   dl { display: grid; grid-template-columns: max-content 1fr; gap: .2rem .8rem; font-size: 13px; }
   dt { color: var(--muted); } dd { margin: 0; min-width: 0; }
   code { font-family: ui-monospace, monospace; font-size: 12.5px; }
-  .hash { word-break: break-all; }
+  .warn { border-left: 3px solid var(--accent); padding-left: .6rem; }
   .tag { display: inline-block; padding: 0 .5rem; border-radius: 999px; border: 1px solid var(--line); font-size: 12px; }
   .url { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: .6rem 0; }
   .url input { flex: 1; min-width: 12rem; font: 13px ui-monospace, monospace; padding: .4rem; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; }
@@ -204,21 +206,16 @@ function page(catalog, extras) {
 </head>
 <body>
 <header>
-  <div class="intro">
-    <h1>${esc(catalog.title)}</h1>
-    <p>${esc(catalog.description)}</p>
-    ${config.webAppUrl ? `<a class="add" href="${esc(importTarget())}">Add to Sensor-BLE</a>` : ''}
-    <p class="muted">${catalog.decoders.length} decoder${catalog.decoders.length === 1 ? '' : 's'} ·
-      machine-readable: <a href="decoders.json">decoders.json</a> ·
-      Sensor Logger: copy a decoder URL into <em>Custom Decoders → Add Decoder</em>.</p>
-  </div>
-  <div class="qr">${qrSvg(target)}<div class="muted">Scan to add this catalog</div></div>
+  <h1>${esc(site.title)}</h1>
+  <p>${esc(site.description)}</p>
+  <p class="muted">Scan a QR code with Sensor Logger 1.68 or newer, or copy a decoder URL into
+    <em>Custom Decoders → Add Decoder</em>.</p>
 </header>
 <main>
 ${cards}
 </main>
-<footer class="muted">Built ${esc(catalog.generated)} from
-  ${catalog.homepage ? `<a href="${esc(catalog.homepage)}">${esc(catalog.homepage)}</a>` : 'this repository'}.
+<footer class="muted">Built ${esc(site.generated)} from
+  ${site.homepage ? `<a href="${esc(site.homepage)}">${esc(site.homepage)}</a>` : 'this repository'}.
   Decoders follow the <a href="https://github.com/tszheichoi/sensor-ble#sensor-ble-api">sensor-ble API</a>.</footer>
 <script>
   for (const b of document.querySelectorAll('button[data-copy]')) {
@@ -244,8 +241,7 @@ async function main() {
   const dup = names.find((n, i) => names.indexOf(n) !== i);
   if (dup) throw new Error(`duplicate decoderName: ${dup}`);
 
-  const catalog = {
-    schema: 1,
+  const site = {
     title: config.title,
     description: config.description,
     homepage: config.homepage ?? '',
@@ -256,15 +252,14 @@ async function main() {
   fs.rmSync(OUT, { recursive: true, force: true });
   fs.mkdirSync(path.join(OUT, 'decoders'), { recursive: true });
   for (const f of files) fs.copyFileSync(path.join(SRC, f), path.join(OUT, 'decoders', f));
-  fs.writeFileSync(path.join(OUT, 'decoders.json'), JSON.stringify(catalog, null, 2) + '\n');
-  fs.writeFileSync(path.join(OUT, 'index.html'), page(catalog, loaded));
+  fs.writeFileSync(path.join(OUT, 'index.html'), page(site, loaded));
   fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
 
   console.log(`built ${files.length} decoder(s) into site/ for ${siteUrl}`);
-  for (const e of catalog.decoders) console.log(`  ${e.decoderName} v${e.version}  ${e.sha256.slice(0, 12)}…`);
+  for (const e of site.decoders) console.log(`  ${e.decoderName} v${e.version}  ${deepLink(new URL(e.url, siteUrl).href)}`);
 }
 
 main().catch((e) => {
-  console.error(`build-catalog: ${e.message}`);
+  console.error(`build: ${e.message}`);
   process.exit(1);
 });

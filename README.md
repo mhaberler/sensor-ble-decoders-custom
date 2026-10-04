@@ -1,38 +1,26 @@
 # Sensor-BLE decoders (mhaberler)
 
-A catalog of [sensor-ble](https://github.com/tszheichoi/sensor-ble) BLE
-decoders, published at **<https://mhaberler.github.io/sensor-ble-decoders-custom/>**
-as a browsable page plus a machine-readable `decoders.json`.
+Custom [sensor-ble](https://github.com/tszheichoi/sensor-ble) BLE decoders for
+[Sensor Logger](https://www.tszheichoi.com/sensorlogger), published at
+**<https://mhaberler.github.io/sensor-ble-decoders-custom/>** — one QR code per
+decoder.
 
-| Decoder | What it decodes | License |
-|---|---|---|
-| `theengs` | every device [TheengsDecoder](https://decoder.theengs.io/) supports — a catch-all fallback (`matchAll`), tried after all other decoders; inactive in Sensor Logger | GPL-3.0-only |
-| `mystery` | level, voltage, temperature and serial from company-ID 0x1044 adverts (divined) | MIT |
+| Decoder | What it decodes | License | Add to Sensor Logger |
+| --- | --- | --- | --- |
+| `mystery` | level, voltage, temperature and serial from company-ID 0x1044 adverts (divined) | MIT | `sensorlogger://decoder/https%3A%2F%2Fmhaberler.github.io%2Fsensor-ble-decoders-custom%2Fdecoders%2Fmystery.js` |
+| `tess5600` | temperature, pressure and battery from the TE Connectivity M5600/U5600 pressure transducer (connected sensor) | GPL-3.0-only | `sensorlogger://decoder/https%3A%2F%2Fmhaberler.github.io%2Fsensor-ble-decoders-custom%2Fdecoders%2Ftess5600.js` |
+| `theengs` | every device [TheengsDecoder](https://decoder.theengs.io/) supports — a catch-all fallback (`matchAll`) | GPL-3.0-only | `sensorlogger://decoder/https%3A%2F%2Fmhaberler.github.io%2Fsensor-ble-decoders-custom%2Fdecoders%2Ftheengs.js` |
 
-- **Sensor-BLE web and mobile app** ([theengs-online-decoder](https://github.com/mhaberler/theengs-online-decoder)):
-  this catalog is preset; install from the Decoders tab. Or use the page's
-  **Add to Sensor-BLE** button / QR code.
-- **Sensor Logger:** copy a decoder URL from the page into *Custom Decoders →
-  Add Decoder* (`theengs` needs `matchAll`, which Sensor Logger doesn't support).
+Scan a QR code on the page, or open a link above on the phone: Sensor Logger
+(1.68 or newer) opens *Add Custom Decoder* with the URL pre-filled
+([deep link docs](https://github.com/tszheichoi/awesome-sensor-logger/blob/main/DEEP_LINKS.md#custom-ble-decoders)).
 
-`decoders/theengs.js` is **generated** in theengs-online-decoder — don't edit
-it here; update it there with `bun run publish-catalog`, then commit and push
-this repo.
+`theengs` needs `matchAll`, which Sensor Logger doesn't support: it imports but
+stays inactive there.
 
-Built from the [sensor-ble-decoder-catalog](https://github.com/mhaberler/sensor-ble-decoder-catalog)
-template; the rest of this README is the template's documentation.
-
-## Make your own catalog
-
-1. Click **Use this template** → *Create a new repository*.
-2. In the new repo: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. Edit [catalog.config.json](catalog.config.json): `title`, `description`, `homepage`.
-4. Replace or add decoders in [decoders/](decoders/) (see below) and push to `main`.
-
-The [pages workflow](.github/workflows/pages.yml) builds the site, runs every
-decoder's tests, and publishes to `https://<you>.github.io/<repo>/`. A failing
-test fails the build, so a broken decoder is never published. Pull requests are
-built and tested but not deployed.
+`decoders/theengs.js` is **generated** in
+[theengs-online-decoder](https://github.com/mhaberler/theengs-online-decoder) —
+don't edit it here.
 
 ## Add a decoder
 
@@ -44,83 +32,38 @@ and Sensor Logger's custom-decoder rules:
 - exports a `decoder` object with a unique `decoderName` and an
   `advertisementDecode(manufacturerData, serviceData, meta)` function that
   returns an object of readings, or `null` if the payload isn't for it
+  (connected sensors: `start()` and a `notify` array instead)
 - matched by `manufacturer` (company ID as it appears in the payload, e.g.
   `"9904"` for Ruuvi's 0x0499), `serviceUUID` (e.g. `"fcd2"`), or `name`
 - output keys follow sensor-ble's conventions: `name_unit`, e.g.
   `temperature_C`, `acceleration_x_mg`, `battery_mV`, `…_dimensionless`
 - exports `tests`: at least one `{ given: { manufacturerData: "<hex>" }, expected: {…} }`
   pair (`given.serviceData` is `{ "<uuid>": "<hex>" }`). The build compares
-  `advertisementDecode` output with `expected` exactly.
+  the decoder's output with `expected` exactly.
 
-Catalog metadata goes on the same `decoder` object; hosts that don't know it
-ignore it:
-
-| Field | Meaning |
-|---|---|
-| `title` | display name |
-| `description` | one-line summary |
-| `version` | semver; bump it on every change so apps can offer the update |
-| `author`, `license` | shown on the page and in apps (the template is MIT; pick your own per decoder) |
-| `tags` | keywords for search |
-
+Page metadata goes on the same `decoder` object; hosts that don't know it
+ignore it: `title`, `description`, `version`, `author`, `license`, `tags`.
 A longer description can go in `decoders/<name>.md` (paragraphs, `code`,
 `**bold**`, `[links](https://…)`).
 
-[decoders/ruuvi_example.js](decoders/ruuvi_example.js) is a complete example:
-RuuviTag data format 5, written from Ruuvi's public spec, tested with the spec's
-four test vectors. It's named `ruuvi_example` so it doesn't replace the
-built-in `ruuvi` decoder of sensor-ble hosts.
+Push to `main`: the [pages workflow](.github/workflows/pages.yml) runs every
+decoder's tests and publishes the page. A failing test fails the build, so a
+broken decoder is never published.
 
 ## Build and preview locally
 
 Node 20 or newer; nothing to install.
 
 ```sh
-node scripts/build-catalog.js     # runs the tests, writes site/
-node scripts/preview.js           # serves site/ on http://localhost:8080/ (CORS open)
+node scripts/build.js       # runs the tests, writes site/
+node scripts/preview.js     # serves site/ on http://localhost:8080/
 ```
 
-## Catalog format
-
-`site/decoders.json`:
-
-```json
-{
-  "schema": 1,
-  "title": "…", "description": "…", "homepage": "…", "generated": "2026-…",
-  "decoders": [{
-    "decoderName": "ruuvi_example", "title": "…", "description": "…",
-    "version": "1.0.0", "author": "…", "license": "MIT", "tags": ["ruuvi"],
-    "url": "decoders/ruuvi_example.js",
-    "sha256": "…",
-    "matchers": { "manufacturer": "9904" },
-    "updated": "2026-…"
-  }]
-}
-```
-
-- `url` is relative to `decoders.json`, so a copy of the template works
-  without edits. Absolute URLs (e.g. a gist's raw URL) are allowed too.
-- `sha256` is the hash of the decoder file; apps refuse to install a file that
-  doesn't match.
-- `schema` is bumped only for incompatible changes.
-
-The page links the JSON with
-`<link rel="alternate" type="application/vnd.sensorble.catalog+json" href="decoders.json">`,
-so apps accept either the page URL or the JSON URL.
-
-## Page options
-
-[catalog.config.json](catalog.config.json):
-
-| Key | Effect |
-|---|---|
-| `title`, `description`, `homepage` | page header and `decoders.json` |
-| `webAppUrl` | shows an **Add to Sensor-BLE** button linking to `<webAppUrl>?catalog=<this site>`; remove it to hide the button |
-| `qrTarget` | what the page's QR code opens: `"web"` (the Add link, or the site URL without `webAppUrl`) or `"deeplink"` (`sensorble://catalog?url=…`, for when the mobile app supports it) |
-| `siteUrl` | public URL of the site; normally set automatically from GitHub Pages (needed only for custom setups) |
+`siteUrl` in [site.config.json](site.config.json) is the public URL the deep
+links point at; CI overrides it with the GitHub Pages URL (`SITE_URL`).
 
 ## License
 
-MIT — see [LICENSE](LICENSE). The vendored QR encoder
-([scripts/vendor/qrcode.cjs](scripts/vendor/qrcode.cjs)) is MIT, © Kazuhiko Arase.
+MIT — see [LICENSE](LICENSE); each decoder states its own license. The vendored
+QR encoder ([scripts/vendor/qrcode.cjs](scripts/vendor/qrcode.cjs)) is MIT,
+© Kazuhiko Arase.

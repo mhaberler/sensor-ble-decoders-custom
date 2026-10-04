@@ -1,4 +1,4 @@
-# Build the catalog (runs every decoder's tests) and publish it to GitHub Pages.
+# Build the site (runs every decoder's tests) and publish it to GitHub Pages.
 # Pull requests only build and test; pushes to main also deploy.
 
 name: pages
@@ -29,10 +29,10 @@ jobs:
       - id: pages
         if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v6
-      - name: Build catalog (runs decoder tests)
+      - name: Build site (runs decoder tests)
         env:
-          CATALOG_URL: ${{ steps.pages.outputs.base_url }}
-        run: node scripts/build-catalog.js
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
+        run: node scripts/build.js
       - if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5
         with:
